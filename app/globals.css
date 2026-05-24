@@ -1,0 +1,39 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --background: linear-gradient(180deg, #f8fafc 0%, #eef2ff 42%, #ffffff 100%);
+}
+
+:root.dark {
+  --background: linear-gradient(180deg, #020617 0%, #0f172a 46%, #111827 100%);
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+body {
+  min-height: 100vh;
+  background: var(--background);
+  background-attachment: fixed;
+}
+
+@layer utilities {
+  .icon-pulse {
+    animation: iconPulse 2.8s ease-in-out infinite;
+  }
+}
+
+@keyframes iconPulse {
+  0%,
+  100% {
+    transform: scale(1);
+    opacity: 0.75;
+  }
+  50% {
+    transform: scale(1.04);
+    opacity: 1;
+  }
+}
