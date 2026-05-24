@@ -1,0 +1,294 @@
+'use client';
+
+import { useState, useEffect } from 'react';
+import { uploadHeroImage, deleteHeroImage, getHeroImages } from '@/app/actions/heroImages';
+import { Upload, Trash2, Loader2 } from 'lucide-react';
+import Image from 'next/image';
+
+interface HeroImage {
+  id: string;
+  public_id: string;
+  secure_url: string;
+  heading: string;
+  subheading: string;
+  width: number;
+  height: number;
+}
+
+export default function ManageHomePage() {
+  const [file, setFile] = useState<File | null>(null);
+  const [heading, setHeading] = useState('');
+  const [subheading, setSubheading] = useState('');
+  const [isLoading, setIsLoading] = useState(false);
+  const [isLoadingImages, setIsLoadingImages] = useState(true);
+  const [heroImages, setHeroImages] = useState<HeroImage[]>([]);
+  const [error, setError] = useState('');
+  const [success, setSuccess] = useState('');
+  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+
+  // Fetch hero images on mount
+  useEffect(() => {
+    fetchImages();
+  }, []);
+
+  const fetchImages = async () => {
+    setIsLoadingImages(true);
+    const images = await getHeroImages();
+    setHeroImages(images);
+    setIsLoadingImages(false);
+  };
+
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const selectedFile = e.target.files?.[0];
+    if (selectedFile) {
+      setFile(selectedFile);
+      const reader = new FileReader();
+      reader.onload = (event) => {
+        setPreviewUrl(event.target?.result as string);
+      };
+      reader.readAsDataURL(selectedFile);
+    }
+  };
+
+  const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    setError('');
+    setSuccess('');
+
+    if (!file) {
+      setError('Please select an image');
+      return;
+    }
+
+    setIsLoading(true);
+
+    const formData = new FormData();
+    formData.append('file', file);
+    formData.append('heading', heading);
+    formData.append('subheading', subheading);
+
+    const result = await uploadHeroImage(formData);
+
+    if (result.success) {
+      setSuccess('Hero image uploaded successfully!');
+      setFile(null);
+      setHeading('');
+      setSubheading('');
+      setPreviewUrl(null);
+      const input = document.querySelector('input[type="file"]') as HTMLInputElement;
+      if (input) input.value = '';
+      await fetchImages();
+    } else {
+      setError(result.error || 'Failed to upload image');
+    }
+
+    setIsLoading(false);
+  };
+
+  const handleDelete = async (publicId: string, docId: string) => {
+    if (!confirm('Are you sure you want to delete this image?')) {
+      return;
+    }
+
+    setIsLoading(true);
+    const result = await deleteHeroImage(publicId, docId);
+
+    if (result.success) {
+      setSuccess('Image deleted successfully!');
+      await fetchImages();
+    } else {
+      setError(result.error || 'Failed to delete image');
+    }
+
+    setIsLoading(false);
+  };
+
+  return (
+    <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100 p-6 md:p-8">
+      {/* Header */}
+      <div className="mb-8">
+        <h1 className="text-3xl md:text-4xl font-bold text-slate-900 mb-2">
+          Manage Homepage
+        </h1>
+        <p className="text-slate-600">Upload and manage hero carousel images for your homepage.</p>
+      </div>
+
+      {/* Alert Messages */}
+      {error && (
+        <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-lg">
+          <p className="text-red-700 font-medium">{error}</p>
+        </div>
+      )}
+
+      {success && (
+        <div className="mb-6 p-4 bg-green-50 border border-green-200 rounded-lg">
+          <p className="text-green-700 font-medium">{success}</p>
+        </div>
+      )}
+
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+        {/* Upload Form */}
+        <div className="lg:col-span-1">
+          <div className="bg-white rounded-lg shadow-md border border-slate-200 overflow-hidden sticky top-8">
+            <div className="bg-slate-900 px-6 py-4">
+              <h2 className="text-lg font-bold text-white">Upload Hero Image</h2>
+            </div>
+
+            <form onSubmit={handleSubmit} className="p-6 space-y-4">
+              {/* File Input */}
+              <div>
+                <label htmlFor="file" className="block text-sm font-medium text-slate-900 mb-2">
+                  Image File
+                </label>
+                <div className="border-2 border-dashed border-slate-300 rounded-lg p-6 text-center cursor-pointer hover:border-yellow-400 transition-colors">
+                  <input
+                    type="file"
+                    id="file"
+                    accept="image/*"
+                    onChange={handleFileChange}
+                    className="hidden"
+                  />
+                  <label htmlFor="file" className="cursor-pointer">
+                    {previewUrl ? (
+                      <div className="relative h-32 mx-auto mb-2">
+                        <Image
+                          src={previewUrl}
+                          alt="Preview"
+                          fill
+                          className="object-contain"
+                        />
+                      </div>
+                    ) : (
+                      <div className="py-8">
+                        <Upload className="w-8 h-8 mx-auto mb-2 text-slate-400" />
+                        <p className="text-sm text-slate-600 font-medium">
+                          {file ? file.name : 'Click to upload'}
+                        </p>
+                      </div>
+                    )}
+                  </label>
+                </div>
+              </div>
+
+              {/* Heading Input */}
+              <div>
+                <label htmlFor="heading" className="block text-sm font-medium text-slate-900 mb-2">
+                  Heading (Optional)
+                </label>
+                <input
+                  type="text"
+                  id="heading"
+                  value={heading}
+                  onChange={(e) => setHeading(e.target.value)}
+                  placeholder="e.g., Excellence in Education"
+                  className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-yellow-400"
+                />
+              </div>
+
+              {/* Subheading Input */}
+              <div>
+                <label htmlFor="subheading" className="block text-sm font-medium text-slate-900 mb-2">
+                  Subheading (Optional)
+                </label>
+                <textarea
+                  id="subheading"
+                  value={subheading}
+                  onChange={(e) => setSubheading(e.target.value)}
+                  placeholder="Add a descriptive subtitle"
+                  rows={3}
+                  className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-yellow-400"
+                />
+              </div>
+
+              {/* Submit Button */}
+              <button
+                type="submit"
+                disabled={isLoading || !file}
+                className="w-full px-4 py-3 bg-yellow-400 hover:bg-yellow-500 disabled:opacity-50 disabled:cursor-not-allowed text-slate-900 font-semibold rounded-lg transition-colors flex items-center justify-center gap-2"
+              >
+                {isLoading ? (
+                  <>
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                    Uploading...
+                  </>
+                ) : (
+                  <>
+                    <Upload className="w-4 h-4" />
+                    Upload Image
+                  </>
+                )}
+              </button>
+            </form>
+          </div>
+        </div>
+
+        {/* Hero Images Grid */}
+        <div className="lg:col-span-2">
+          <div className="bg-white rounded-lg shadow-md border border-slate-200 overflow-hidden">
+            <div className="bg-gradient-to-r from-slate-900 to-slate-800 px-6 py-4">
+              <h2 className="text-lg font-bold text-white">
+                Hero Images ({heroImages.length})
+              </h2>
+            </div>
+
+            {isLoadingImages ? (
+              <div className="p-8 text-center">
+                <Loader2 className="w-8 h-8 mx-auto mb-4 animate-spin text-slate-400" />
+                <p className="text-slate-600">Loading images...</p>
+              </div>
+            ) : heroImages.length === 0 ? (
+              <div className="p-8 text-center">
+                <p className="text-slate-500 font-medium">No hero images yet.</p>
+                <p className="text-slate-400 text-sm mt-1">Upload your first hero image to get started.</p>
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 p-6">
+                {heroImages.map((image) => (
+                  <div
+                    key={image.id}
+                    className="border border-slate-200 rounded-lg overflow-hidden hover:shadow-lg transition-shadow group"
+                  >
+                    {/* Image */}
+                    <div className="relative h-40 bg-slate-100 overflow-hidden">
+                      <Image
+                        src={image.secure_url}
+                        alt={image.heading || 'Hero image'}
+                        fill
+                        className="object-cover group-hover:scale-105 transition-transform duration-300"
+                      />
+                      <button
+                        onClick={() => handleDelete(image.public_id, image.id)}
+                        disabled={isLoading}
+                        className="absolute top-2 right-2 p-2 bg-red-600 text-white rounded-full opacity-0 group-hover:opacity-100 transition-opacity disabled:opacity-50"
+                        title="Delete image"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </button>
+                    </div>
+
+                    {/* Details */}
+                    <div className="p-4">
+                      {image.heading && (
+                        <p className="font-semibold text-slate-900 text-sm mb-1">
+                          {image.heading}
+                        </p>
+                      )}
+                      {image.subheading && (
+                        <p className="text-slate-600 text-xs mb-3 line-clamp-2">
+                          {image.subheading}
+                        </p>
+                      )}
+                      <div className="text-xs text-slate-500">
+                        {image.width} × {image.height}px
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
