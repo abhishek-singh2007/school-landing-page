@@ -32,15 +32,40 @@ export default function ManageHomePage() {
   }, []);
 
   const fetchImages = async () => {
-    setIsLoadingImages(true);
-    const images = await getHeroImages();
-    setHeroImages(images);
-    setIsLoadingImages(false);
+    try {
+      setIsLoadingImages(true);
+      console.log('[fetchImages] Fetching images from Firebase...');
+      const images = await getHeroImages();
+      console.log('[fetchImages] Received', images.length, 'images from Firebase');
+      setHeroImages(images);
+    } catch (err) {
+      console.error('[fetchImages] Error fetching images:', err);
+      setError('Failed to load images');
+    } finally {
+      setIsLoadingImages(false);
+    }
   };
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setError('');
+    setSuccess('');
+    
     const selectedFile = e.target.files?.[0];
     if (selectedFile) {
+      // Validate file type
+      const validTypes = ['image/jpeg', 'image/png', 'image/webp'];
+      if (!validTypes.includes(selectedFile.type)) {
+        setError('Invalid file type. Only JPG, PNG, and WebP images are allowed.');
+        return;
+      }
+
+      // Validate file size (5MB limit)
+      const maxSize = 5 * 1024 * 1024; // 5MB in bytes
+      if (selectedFile.size > maxSize) {
+        setError('File size must be less than 5MB. Your file is ' + (selectedFile.size / (1024 * 1024)).toFixed(2) + 'MB.');
+        return;
+      }
+
       setFile(selectedFile);
       const reader = new FileReader();
       reader.onload = (event) => {
@@ -55,34 +80,79 @@ export default function ManageHomePage() {
     setError('');
     setSuccess('');
 
+    // Final validation before upload
     if (!file) {
-      setError('Please select an image');
+      setError('Please select an image file');
+      return;
+    }
+
+    // Validate file size one more time (client-side safety check)
+    const maxSize = 5 * 1024 * 1024; // 5MB
+    if (file.size > maxSize) {
+      setError('File size must be less than 5MB. Your file is ' + (file.size / (1024 * 1024)).toFixed(2) + 'MB.');
+      return;
+    }
+
+    // Validate file type one more time
+    const validTypes = ['image/jpeg', 'image/png', 'image/webp'];
+    if (!validTypes.includes(file.type)) {
+      setError('Invalid file type. Only JPG, PNG, and WebP images are allowed.');
       return;
     }
 
     setIsLoading(true);
 
-    const formData = new FormData();
-    formData.append('file', file);
-    formData.append('heading', heading);
-    formData.append('subheading', subheading);
+    try {
+      const formData = new FormData();
+      formData.append('file', file);
+      formData.append('heading', heading);
+      formData.append('subheading', subheading);
 
-    const result = await uploadHeroImage(formData);
+      console.log('[handleSubmit] Calling uploadHeroImage...');
+      const result = await uploadHeroImage(formData);
 
-    if (result.success) {
-      setSuccess('Hero image uploaded successfully!');
-      setFile(null);
-      setHeading('');
-      setSubheading('');
-      setPreviewUrl(null);
-      const input = document.querySelector('input[type="file"]') as HTMLInputElement;
-      if (input) input.value = '';
-      await fetchImages();
-    } else {
-      setError(result.error || 'Failed to upload image');
+      if (result.success) {
+        console.log('[handleSubmit] Upload successful:', result.data);
+        setSuccess('Hero image uploaded successfully!');
+        
+        // Clear form
+        setFile(null);
+        setHeading('');
+        setSubheading('');
+        setPreviewUrl(null);
+        
+        // Reset file input
+        const input = document.querySelector('input[type="file"]') as HTMLInputElement;
+        if (input) input.value = '';
+        
+        // Re-fetch images from Firebase to ensure UI reflects database state
+        console.log('[handleSubmit] Re-fetching images from Firebase...');
+        await fetchImages();
+        console.log('[handleSubmit] Images re-fetched successfully');
+      } else {
+        console.error('[handleSubmit] Upload failed:', result.error);
+        setError(result.error || 'Failed to upload image. Please try again.');
+      }
+    } catch (err) {
+      console.error('[handleSubmit] Unexpected error during upload:', err);
+      
+      // Provide user-friendly error messages for common errors
+      if (err instanceof Error) {
+        if (err.message.includes('network') || err.message.includes('fetch')) {
+          setError('Network error. Please check your connection and try again.');
+        } else if (err.message.includes('timeout')) {
+          setError('Upload timed out. The file may be too large. Please try again.');
+        } else {
+          setError('Error uploading image: ' + err.message);
+        }
+      } else {
+        setError('An unexpected error occurred during upload. Please try again.');
+      }
+    } finally {
+      // Always reset loading state, even if there's an error
+      setIsLoading(false);
+      console.log('[handleSubmit] Upload process completed, loading state reset');
     }
-
-    setIsLoading(false);
   };
 
   const handleDelete = async (publicId: string, docId: string) => {
@@ -91,50 +161,62 @@ export default function ManageHomePage() {
     }
 
     setIsLoading(true);
-    const result = await deleteHeroImage(publicId, docId);
 
-    if (result.success) {
-      setSuccess('Image deleted successfully!');
-      await fetchImages();
-    } else {
-      setError(result.error || 'Failed to delete image');
+    try {
+      console.log('[handleDelete] Deleting image:', { publicId, docId });
+      const result = await deleteHeroImage(publicId, docId);
+
+      if (result.success) {
+        console.log('[handleDelete] Deletion successful');
+        setSuccess('Image deleted successfully!');
+        console.log('[handleDelete] Re-fetching images from Firebase...');
+        await fetchImages();
+        console.log('[handleDelete] Images re-fetched successfully');
+      } else {
+        console.error('[handleDelete] Deletion failed:', result.error);
+        setError(result.error || 'Failed to delete image');
+      }
+    } catch (err) {
+      console.error('[handleDelete] Unexpected error:', err);
+      setError(err instanceof Error ? err.message : 'An unexpected error occurred');
+    } finally {
+      setIsLoading(false);
+      console.log('[handleDelete] Delete process completed, loading state reset');
     }
-
-    setIsLoading(false);
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100 p-6 md:p-8">
+    <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100 p-4 sm:p-6 md:p-8">
       {/* Header */}
-      <div className="mb-8">
-        <h1 className="text-3xl md:text-4xl font-bold text-slate-900 mb-2">
+      <div className="mb-6 sm:mb-8">
+        <h1 className="text-2xl sm:text-3xl md:text-4xl font-bold text-slate-900 mb-2">
           Manage Homepage
         </h1>
-        <p className="text-slate-600">Upload and manage hero carousel images for your homepage.</p>
+        <p className="text-sm sm:text-base text-slate-600">Upload and manage hero carousel images for your homepage.</p>
       </div>
 
       {/* Alert Messages */}
       {error && (
-        <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-lg">
-          <p className="text-red-700 font-medium">{error}</p>
+        <div className="mb-4 sm:mb-6 p-4 bg-red-50 border border-red-200 rounded-lg">
+          <p className="text-sm sm:text-base text-red-700 font-medium">{error}</p>
         </div>
       )}
 
       {success && (
-        <div className="mb-6 p-4 bg-green-50 border border-green-200 rounded-lg">
-          <p className="text-green-700 font-medium">{success}</p>
+        <div className="mb-4 sm:mb-6 p-4 bg-green-50 border border-green-200 rounded-lg">
+          <p className="text-sm sm:text-base text-green-700 font-medium">{success}</p>
         </div>
       )}
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 sm:gap-6 md:gap-8">
         {/* Upload Form */}
-        <div className="lg:col-span-1">
-          <div className="bg-white rounded-lg shadow-md border border-slate-200 overflow-hidden sticky top-8">
-            <div className="bg-slate-900 px-6 py-4">
-              <h2 className="text-lg font-bold text-white">Upload Hero Image</h2>
+        <div className="md:col-span-1">
+          <div className="bg-white rounded-lg shadow-md border border-slate-200 overflow-hidden sticky top-4 sm:top-6 md:top-8">
+            <div className="bg-slate-900 px-4 sm:px-6 py-4">
+              <h2 className="text-base sm:text-lg font-bold text-white">Upload Hero Image</h2>
             </div>
 
-            <form onSubmit={handleSubmit} className="p-6 space-y-4">
+            <form onSubmit={handleSubmit} className="p-4 sm:p-6 space-y-4">
               {/* File Input */}
               <div>
                 <label htmlFor="file" className="block text-sm font-medium text-slate-900 mb-2">
@@ -223,7 +305,7 @@ export default function ManageHomePage() {
         </div>
 
         {/* Hero Images Grid */}
-        <div className="lg:col-span-2">
+        <div className="md:col-span-2">
           <div className="bg-white rounded-lg shadow-md border border-slate-200 overflow-hidden">
             <div className="bg-gradient-to-r from-slate-900 to-slate-800 px-6 py-4">
               <h2 className="text-lg font-bold text-white">
@@ -242,7 +324,7 @@ export default function ManageHomePage() {
                 <p className="text-slate-400 text-sm mt-1">Upload your first hero image to get started.</p>
               </div>
             ) : (
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 p-6">
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4 p-4 sm:p-6">
                 {heroImages.map((image) => (
                   <div
                     key={image.id}

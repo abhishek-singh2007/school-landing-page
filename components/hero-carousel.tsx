@@ -80,19 +80,41 @@ export function HeroCarousel() {
         const querySnapshot = await getDocs(q);
 
         if (querySnapshot.empty) {
+          console.log("No hero images found in Firebase, using default slides");
           setSlides(defaultSlides);
         } else {
-          const images = querySnapshot.docs.map((doc) => ({
-            id: doc.id,
-            title: doc.data().heading || "Hero Image",
-            eyebrow: "Featured",
-            description: doc.data().subheading || "Explore our latest content",
-            imageSrc: doc.data().secure_url,
-            alt: doc.data().heading,
-          }));
-          setSlides(images);
+          const images = querySnapshot.docs
+            .map((doc) => {
+              const data = doc.data();
+              const imageUrl = data.secure_url || data.cloudinary_url;
+              
+              // Validate that required fields exist
+              if (!imageUrl) {
+                console.warn("Image document missing secure_url:", doc.id);
+                return null;
+              }
+
+              return {
+                id: doc.id,
+                title: data.heading || "Hero Image",
+                eyebrow: "Featured",
+                description: data.subheading || "Explore our latest content",
+                imageSrc: imageUrl,
+                alt: data.heading || "Hero image",
+              };
+            })
+            .filter((img) => img !== null) as Slide[];
+
+          if (images.length === 0) {
+            console.log("No valid images found, using default slides");
+            setSlides(defaultSlides);
+          } else {
+            console.log(`Successfully loaded ${images.length} hero images from Firebase`);
+            setSlides(images);
+          }
         }
-      } catch {
+      } catch (error) {
+        console.error("Error fetching hero images from Firebase:", error);
         setSlides(defaultSlides);
       } finally {
         setIsLoading(false);
@@ -141,17 +163,16 @@ export function HeroCarousel() {
             transition={{ duration: 0.55, ease: "easeOut" }}
             className="mt-3 sm:mt-4 max-w-3xl text-2xl sm:text-3xl sm:text-4xl lg:text-5xl lg:text-6xl font-black tracking-tight text-slate-950 dark:text-white"
           >
-            A responsive hero and glass navbar built for strong first impressions.
+            A responsive hero carousel with dynamic image management.
           </motion.h1>
         </div>
 
         <h2 className="max-w-xl text-xs sm:text-sm leading-6 sm:leading-7 text-slate-600 dark:text-slate-300 sm:text-base">
-          Embla keeps the slider lightweight, Framer Motion adds polish to the menu, and Tailwind handles the layout without
-          sacrificing accessibility.
+          Upload and manage hero carousel images from the admin panel. Your images will appear automatically on the homepage.
         </h2>
       </div>
 
-      <div className="rounded-2xl sm:rounded-[2rem] border border-white/60 bg-white/65 p-3 sm:p-4 lg:p-5 shadow-glass backdrop-blur-xl dark:border-white/10 dark:bg-slate-950/55">
+      <div className="rounded-2xl sm:rounded-[2rem] border border-white/60 bg-white/65 p-3 sm:p-4 lg:p-5 shadow-glass backdrop-blur-xl dark:border-white/10 dark:bg-slate-950/55 overflow-hidden">
         <div className="mb-3 sm:mb-4 flex items-center justify-between gap-2 sm:gap-4 px-2 sm:px-3">
           <p className="text-xs sm:text-sm font-medium uppercase tracking-[0.3em] text-slate-500 dark:text-slate-400">Hero Carousel</p>
           <div className="flex items-center gap-2">
@@ -179,47 +200,53 @@ export function HeroCarousel() {
         </div>
 
         {isLoading ? (
-          <div className="flex items-center justify-center min-h-[40vh] sm:min-h-[52vh]">
-            <p className="text-slate-500">Loading hero images...</p>
+          <div className="flex items-center justify-center min-h-[40vh] sm:min-h-[52vh] md:min-h-[70vh]">
+            <div className="text-center">
+              <div className="inline-block animate-spin mb-4">
+                <svg className="h-8 w-8 text-slate-400" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                </svg>
+              </div>
+              <p className="text-slate-600 font-medium">Loading hero images...</p>
+            </div>
           </div>
         ) : (
           <>
             <div className="overflow-hidden" ref={emblaRef}>
               <div className="flex touch-pan-y">
                 {slides.map((slide) => (
-                  <div key={slide.id || slide.eyebrow} className="min-w-0 flex-[0_0_100%] px-1 pb-2 sm:px-2">
-                    <article className="grid gap-4 sm:gap-6 md:grid-cols-[0.92fr_1.08fr] md:items-stretch">
-                      <div className="flex flex-col justify-between rounded-2xl sm:rounded-[2rem] border border-slate-200/80 bg-slate-950 p-4 sm:p-6 sm:p-8 text-white shadow-[0_24px_80px_rgba(2,6,23,0.35)] dark:border-white/10">
-                        <div>
-                          <p className="text-xs font-semibold uppercase tracking-[0.3em] text-pillar-200">{slide.eyebrow}</p>
-                          <h3 className="mt-3 sm:mt-4 text-2xl sm:text-3xl sm:text-4xl font-semibold tracking-tight">{slide.title}</h3>
-                          <p className="mt-3 sm:mt-4 max-w-md text-xs sm:text-sm leading-6 sm:leading-7 text-slate-300 sm:text-base">{slide.description}</p>
+                  <div key={slide.id || slide.eyebrow} className="min-w-0 flex-[0_0_100%]">
+                    <figure className="relative w-full h-[40vh] sm:h-[52vh] md:h-[70vh]">
+                      {slide.imageSrc ? (
+                        <div className="relative w-full h-full overflow-hidden rounded-2xl sm:rounded-[2rem]">
+                          <Image
+                            src={slide.imageSrc}
+                            alt={getImageAlt(slide)}
+                            fill
+                            className="w-full h-full object-cover"
+                            sizes="100vw"
+                            priority={false}
+                          />
+                          {/* Text overlay at bottom-left if heading or subheading exists */}
+                          {(slide.title || slide.description) && (
+                            <div className="absolute inset-0 bg-gradient-to-t from-black/80 to-transparent" />
+                          )}
+                          {(slide.title || slide.description) && (
+                            <div className="absolute bottom-0 left-0 right-0 p-4 sm:p-6 md:p-8 text-white">
+                              {slide.title && slide.title !== "Hero Image" && (
+                                <h3 className="text-lg sm:text-2xl md:text-3xl font-bold">{slide.title}</h3>
+                              )}
+                              {slide.description && slide.description !== "Explore our latest content" && (
+                                <p className="mt-2 text-xs sm:text-sm md:text-base text-slate-100 max-w-md">{slide.description}</p>
+                              )}
+                            </div>
+                          )}
                         </div>
-
-                        <div className="mt-6 sm:mt-8 flex flex-wrap gap-2 text-xs font-medium uppercase tracking-[0.25em] text-slate-300">
-                          <span className="rounded-full border border-white/10 px-2.5 sm:px-3 py-1.5 sm:py-2">Tailwind</span>
-                          <span className="rounded-full border border-white/10 px-2.5 sm:px-3 py-1.5 sm:py-2">Framer Motion</span>
-                          <span className="rounded-full border border-white/10 px-2.5 sm:px-3 py-1.5 sm:py-2">Embla</span>
-                        </div>
-                      </div>
-
-                      <figure className="min-h-[40vh] sm:min-h-[52vh]">
-                        {slide.imageSrc ? (
-                          <div className="relative h-full min-h-[40vh] sm:min-h-[52vh] overflow-hidden rounded-2xl sm:rounded-[2rem] border border-slate-300/80 bg-white shadow-glass dark:border-white/10 dark:bg-slate-900">
-                            <Image
-                              src={slide.imageSrc}
-                              alt={getImageAlt(slide)}
-                              fill
-                              className="object-cover"
-                              sizes="(max-width: 768px) 100vw, 55vw"
-                              priority={false}
-                            />
-                          </div>
-                        ) : (
-                          <PlaceholderArtwork title={slide.title} />
-                        )}
-                      </figure>
-                    </article>
+                      ) : (
+                        <PlaceholderArtwork title={slide.title} />
+                      )}
+                    </figure>
                   </div>
                 ))}
               </div>
