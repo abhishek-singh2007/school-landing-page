@@ -134,8 +134,7 @@ export async function getHeroImages(): Promise<
     }));
 
     return images;
-  } catch (error) {
-    console.error('Error fetching hero images:', error);
+  } catch {
     return [];
   }
 }
