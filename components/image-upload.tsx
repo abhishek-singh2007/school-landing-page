@@ -7,20 +7,26 @@ import Image from 'next/image';
 interface CloudinaryUploadResponse {
   public_id: string;
   secure_url: string;
-  width: number;
-  height: number;
+  width?: number;
+  height?: number;
 }
 
 interface ImageUploadProps {
   onUpload: (imageData: CloudinaryUploadResponse) => void;
   folder?: string;
   maxSize?: number; // in MB
+  serverAction?: (formData: FormData) => Promise<{
+    success: boolean;
+    data?: { id: string; secure_url: string; public_id: string };
+    error?: string;
+  }>;
 }
 
 export default function ImageUpload({
   onUpload,
   folder = 'jkd-admin',
   maxSize = 5,
+  serverAction,
 }: ImageUploadProps) {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
@@ -31,9 +37,26 @@ export default function ImageUpload({
     try {
       setError('');
       
-      // Validate file size
-      if (file.size > maxSize * 1024 * 1024) {
-        setError(`File size must be less than ${maxSize}MB`);
+      // PHASE 2: STRICT CLIENT-SIDE VALIDATION
+      
+      // 1. Check if file exists
+      if (!file) {
+        setError('Error: Please select an image file');
+        return;
+      }
+
+      // 2. Restrict MIME types to images only
+      const validMimeTypes = ['image/jpeg', 'image/png', 'image/webp'];
+      if (!validMimeTypes.includes(file.type)) {
+        setError('Error: Please upload a JPG, PNG, or WebP image file');
+        return;
+      }
+
+      // 3. Restrict file size to strictly <= 5MB
+      const maxSizeBytes = 5 * 1024 * 1024; // 5MB
+      if (file.size > maxSizeBytes) {
+        const fileSizeMB = (file.size / (1024 * 1024)).toFixed(2);
+        setError(`Error: Please upload an image smaller than 5MB (your file is ${fileSizeMB}MB)`);
         return;
       }
 
@@ -46,27 +69,52 @@ export default function ImageUpload({
 
       setIsLoading(true);
 
-      // Create FormData for Cloudinary
-      const formData = new FormData();
-      formData.append('file', file);
-      formData.append('upload_preset', 'jkd_admin'); // Create this in Cloudinary dashboard
-      formData.append('folder', folder);
-      formData.append('resource_type', 'auto');
+      let data: CloudinaryUploadResponse;
 
-      // Upload to Cloudinary
-      const response = await fetch(
-        `https://api.cloudinary.com/v1_1/${process.env.NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME}/upload`,
-        {
-          method: 'POST',
-          body: formData,
+      if (serverAction) {
+        // Use server action (for Firebase integration)
+        console.log('[ImageUpload] Using server action for upload');
+        const formData = new FormData();
+        formData.append('file', file);
+
+        const response = await serverAction(formData);
+
+        if (!response.success) {
+          console.error('[ImageUpload] Server action error:', response.error);
+          throw new Error(response.error || 'Upload failed');
         }
-      );
 
-      if (!response.ok) {
-        throw new Error('Upload failed');
+        if (!response.data) {
+          throw new Error('No data returned from server');
+        }
+
+        data = response.data;
+      } else {
+        // Direct Cloudinary upload (fallback for client-side only)
+        console.log('[ImageUpload] Using direct Cloudinary upload');
+        const formData = new FormData();
+        formData.append('file', file);
+        formData.append('upload_preset', 'jkd_admin');
+        formData.append('folder', folder);
+        formData.append('resource_type', 'auto');
+
+        const response = await fetch(
+          `https://api.cloudinary.com/v1_1/${process.env.NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME}/upload`,
+          {
+            method: 'POST',
+            body: formData,
+          }
+        );
+
+        if (!response.ok) {
+          console.error('[ImageUpload] Cloudinary upload failed:', response.statusText);
+          throw new Error('Upload failed');
+        }
+
+        data = await response.json();
       }
 
-      const data: CloudinaryUploadResponse = await response.json();
+      // Only reset loading state AFTER successful upload and Firestore save (if using server action)
       onUpload(data);
       setPreview(null);
 
@@ -74,8 +122,12 @@ export default function ImageUpload({
         fileInputRef.current.value = '';
       }
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Upload failed');
+      console.error('[ImageUpload] Upload error:', err);
+      // Display clean, user-friendly error message
+      const errorMessage = err instanceof Error ? err.message : 'Upload failed';
+      setError(`Error: ${errorMessage}`);
     } finally {
+      // Reset loading state after operation completes (success or error)
       setIsLoading(false);
     }
   };
