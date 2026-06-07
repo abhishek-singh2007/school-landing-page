@@ -10,6 +10,9 @@ const nextConfig = {
   },
   experimental: {
     optimizePackageImports: ["framer-motion", "embla-carousel-react"],
+    serverActions: {
+      bodySizeLimit: '5mb',
+    },
   },
 };
 
