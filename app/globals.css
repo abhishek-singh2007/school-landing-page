@@ -20,6 +20,34 @@ body {
   background-attachment: fixed;
 }
 
+body,
+body * {
+  -webkit-touch-callout: none;
+  -webkit-user-select: none;
+  user-select: none;
+}
+
+input,
+textarea,
+select,
+button {
+  -webkit-user-select: auto;
+  user-select: auto;
+}
+
+@media print {
+  html,
+  body {
+    display: none !important;
+  }
+}
+
+@media screen {
+  .site-security-lock {
+    animation: securityPulse 0.25s ease-out;
+  }
+}
+
 @layer utilities {
   .icon-pulse {
     animation: iconPulse 2.8s ease-in-out infinite;
@@ -35,5 +63,17 @@ body {
   50% {
     transform: scale(1.04);
     opacity: 1;
+  }
+}
+
+@keyframes securityPulse {
+  from {
+    opacity: 0;
+    transform: scale(0.98);
+  }
+
+  to {
+    opacity: 1;
+    transform: scale(1);
   }
 }

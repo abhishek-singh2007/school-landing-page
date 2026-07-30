@@ -2,6 +2,7 @@
 
 import { db } from '@/lib/firebase';
 import { doc, updateDoc, collection, query, where, getDocs, orderBy, limit } from 'firebase/firestore';
+import { requireAdminActionAccess } from '@/lib/admin-access';
 
 export async function toggleFeaturedImage(
   docId: string,
@@ -12,6 +13,11 @@ export async function toggleFeaturedImage(
   error?: string;
 }> {
   try {
+    await requireAdminActionAccess('toggleFeaturedImage', {
+      limit: 20,
+      windowMs: 60 * 1000,
+    });
+
     console.log('[toggleFeaturedImage] Toggling featured status for doc:', docId, 'current:', currentStatus);
     
     const docRef = doc(db, 'gallery_images', docId);
@@ -43,7 +49,7 @@ export async function getFeaturedImages(): Promise<{
     secure_url: string;
     public_id: string;
     isFeatured: boolean;
-    created_at: unknown;
+    created_at: string | null;
   }>;
   error?: string;
 }> {
@@ -62,13 +68,17 @@ export async function getFeaturedImages(): Promise<{
     
     console.log('[getFeaturedImages] Found', querySnapshot.size, 'featured images');
     
-    const images = querySnapshot.docs.map((doc) => ({
-      id: doc.id,
-      secure_url: doc.data().secure_url,
-      public_id: doc.data().public_id,
-      isFeatured: doc.data().isFeatured,
-      created_at: doc.data().created_at,
-    }));
+    const images = querySnapshot.docs.map((doc) => {
+      const data = doc.data();
+      return {
+        id: doc.id,
+        secure_url: data.secure_url,
+        public_id: data.public_id,
+        isFeatured: data.isFeatured,
+        // Convert Firebase Timestamp to ISO string for proper serialization
+        created_at: data.created_at ? new Date(data.created_at.toMillis()).toISOString() : null,
+      };
+    });
     
     return {
       success: true,

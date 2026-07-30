@@ -4,6 +4,8 @@ import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { signInWithEmailAndPassword } from 'firebase/auth';
 import { auth } from '@/lib/firebase';
+import { createAdminSession } from '@/app/actions/adminSession';
+import { signOut } from 'firebase/auth';
 
 export default function AdminLoginPage() {
   const router = useRouter();
@@ -22,8 +24,13 @@ export default function AdminLoginPage() {
       const userCredential = await signInWithEmailAndPassword(auth, email, password);
       const token = await userCredential.user.getIdToken();
 
-      // Set admin_session cookie on successful login
-      document.cookie = `admin_session=${token}; path=/; max-age=3600;`;
+      const sessionResult = await createAdminSession(token);
+
+      if (!sessionResult.success) {
+        await signOut(auth);
+        setError(sessionResult.error || 'You are not authorized to access the admin panel.');
+        return;
+      }
 
       // Redirect to admin dashboard
       router.push('/admin');

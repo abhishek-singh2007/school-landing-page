@@ -5,6 +5,9 @@ import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { motion, AnimatePresence } from 'framer-motion';
 import { LayoutDashboard, Home, Info, Trophy, Images, LogOut, Menu, X } from 'lucide-react';
+import { clearAdminSession } from '@/app/actions/adminSession';
+import { signOut } from 'firebase/auth';
+import { auth } from '@/lib/firebase';
 
 export default function DashboardLayout({
   children,
@@ -20,8 +23,9 @@ export default function DashboardLayout({
     setIsMounted(true);
   }, []);
 
-  const handleLogout = () => {
-    document.cookie = 'admin_session=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;';
+  const handleLogout = async () => {
+    await clearAdminSession();
+    await signOut(auth);
     router.push('/admin/login');
   };
 

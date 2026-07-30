@@ -3,6 +3,7 @@
 import { v2 as cloudinary } from 'cloudinary';
 import { db } from '@/lib/firebase';
 import { collection, addDoc, deleteDoc, doc, query, where, getDocs, serverTimestamp } from 'firebase/firestore';
+import { requireAdminActionAccess, requireAdminSession } from '@/lib/admin-access';
 
 cloudinary.config({
   cloud_name: process.env.NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME,
@@ -18,6 +19,11 @@ export async function uploadHeroImage(
   error?: string;
 }> {
   try {
+    await requireAdminActionAccess('uploadHeroImage', {
+      limit: 8,
+      windowMs: 60 * 1000,
+    });
+
     const file = formData.get('file') as File;
     const heading = formData.get('heading') as string;
     const subheading = formData.get('subheading') as string;
@@ -137,6 +143,11 @@ export async function deleteHeroImage(
   docId: string
 ): Promise<{ success: boolean; error?: string }> {
   try {
+    await requireAdminActionAccess('deleteHeroImage', {
+      limit: 20,
+      windowMs: 60 * 1000,
+    });
+
     console.log('[deleteHeroImage] Deleting image:', { publicId, docId });
     
     // Delete from Cloudinary
@@ -171,6 +182,8 @@ export async function getHeroImages(): Promise<
   }>
 > {
   try {
+    await requireAdminSession();
+
     console.log('[getHeroImages] Fetching hero images from Firebase...');
     const q = query(collection(db, 'hero_images'));
     const querySnapshot = await getDocs(q);
