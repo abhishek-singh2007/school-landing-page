@@ -16,7 +16,13 @@ function getFirebaseProjectId() {
 }
 
 function getAllowedAdminEmails() {
-  const configuredEmails = process.env.ADMIN_EMAILS?.split(',') ?? ['admin@jkd.com'];
+  const rawEmails = process.env.ADMIN_EMAILS;
+
+  if (!rawEmails) {
+    throw new Error('Missing ADMIN_EMAILS environment variable');
+  }
+
+  const configuredEmails = rawEmails.split(',');
 
   return configuredEmails
     .map((email) => email.trim().toLowerCase())
