@@ -3,6 +3,7 @@
 import { v2 as cloudinary } from 'cloudinary';
 import { db } from '@/lib/firebase';
 import { collection, addDoc, serverTimestamp } from 'firebase/firestore';
+import { requireAdminActionAccess } from '@/lib/admin-access';
 
 cloudinary.config({
   cloud_name: process.env.NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME,
@@ -18,6 +19,11 @@ export async function uploadGalleryImage(
   error?: string;
 }> {
   try {
+    await requireAdminActionAccess('uploadGalleryImage', {
+      limit: 10,
+      windowMs: 60 * 1000,
+    });
+
     const file = formData.get('file') as File;
 
     // Validation: File

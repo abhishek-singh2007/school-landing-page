@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import "./globals.css";
 import { Navbar } from "@/components/navbar";
+import { SiteRestrictions } from "@/components/site-restrictions";
 
 export const metadata: Metadata = {
   title: "JKD International Inter College | Best school in kanpur panki ",
@@ -25,6 +26,7 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
   return (
     <html lang="en" suppressHydrationWarning data-scroll-behavior="smooth">
       <body className="min-h-screen bg-[var(--background)] text-slate-950 antialiased transition-colors duration-300 dark:text-slate-50">
+        <SiteRestrictions />
         <Navbar />
         {children}
       </body>

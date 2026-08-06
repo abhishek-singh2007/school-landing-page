@@ -10,7 +10,7 @@ interface FeaturedImage {
   secure_url: string;
   public_id: string;
   isFeatured: boolean;
-  created_at: unknown;
+  created_at: string | null;
 }
 
 interface FeaturedGalleryProps {

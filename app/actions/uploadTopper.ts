@@ -3,6 +3,7 @@
 import { v2 as cloudinary } from 'cloudinary';
 import { db } from '@/lib/firebase';
 import { collection, addDoc, deleteDoc, doc, query, getDocs, serverTimestamp } from 'firebase/firestore';
+import { requireAdminActionAccess, requireAdminSession } from '@/lib/admin-access';
 
 cloudinary.config({
   cloud_name: process.env.NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME,
@@ -18,6 +19,11 @@ export async function uploadTopper(
   error?: string;
 }> {
   try {
+    await requireAdminActionAccess('uploadTopper', {
+      limit: 8,
+      windowMs: 60 * 1000,
+    });
+
     const file = formData.get('file') as File;
     const name = formData.get('name') as string;
     const classStream = formData.get('classStream') as string;
@@ -157,6 +163,11 @@ export async function deleteTopper(
   docId: string
 ): Promise<{ success: boolean; error?: string }> {
   try {
+    await requireAdminActionAccess('deleteTopper', {
+      limit: 20,
+      windowMs: 60 * 1000,
+    });
+
     console.log('[deleteTopper] Deleting topper:', { publicId, docId });
 
     // Delete from Cloudinary
@@ -191,6 +202,8 @@ export async function getToppers(): Promise<
   }>
 > {
   try {
+    await requireAdminSession();
+
     console.log('[getToppers] Fetching toppers from Firebase...');
     const q = query(collection(db, 'toppers'));
     const querySnapshot = await getDocs(q);
