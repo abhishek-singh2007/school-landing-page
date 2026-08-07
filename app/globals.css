@@ -20,13 +20,6 @@ body {
   background-attachment: fixed;
 }
 
-body,
-body * {
-  -webkit-touch-callout: none;
-  -webkit-user-select: none;
-  user-select: none;
-}
-
 input,
 textarea,
 select,

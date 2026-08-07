@@ -7,3 +7,4 @@
 - `.env.local` now has the two admin emails in `ADMIN_EMAILS`; passwords are not stored in env and must stay in Firebase Auth.
 - Firebase custom claims are skipped for now, as requested.
 - If any old hardcoded admin email or stale secret appears later, delete it before pushing.
+- Added Hero Mode toggle (Dynamic/Static) with admin-controlled rendering.

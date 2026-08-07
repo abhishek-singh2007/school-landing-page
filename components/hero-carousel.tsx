@@ -86,6 +86,9 @@ export function HeroCarousel() {
           const images = querySnapshot.docs
             .map((doc) => {
               const data = doc.data();
+              if (data.kind === "homepage_setting") {
+                return null;
+              }
               const imageUrl = data.secure_url || data.cloudinary_url;
               
               // Validate that required fields exist

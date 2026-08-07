@@ -1,8 +1,9 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { uploadHeroImage, deleteHeroImage, getHeroImages } from '@/app/actions/heroImages';
-import { Upload, Trash2, Loader2 } from 'lucide-react';
+import { uploadHeroImage, deleteHeroImage, getHeroImages, getHeroMode, setHeroMode } from '@/app/actions/heroImages';
+import type { HeroMode } from '@/app/actions/heroImages';
+import { Upload, Trash2, Loader2, LayoutGrid, Monitor, Image as ImageIcon } from 'lucide-react';
 import Image from 'next/image';
 
 interface HeroImage {
@@ -21,15 +22,21 @@ export default function ManageHomePage() {
   const [subheading, setSubheading] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [isLoadingImages, setIsLoadingImages] = useState(true);
+  const [isSavingMode, setIsSavingMode] = useState(false);
   const [heroImages, setHeroImages] = useState<HeroImage[]>([]);
+  const [heroMode, setHeroModeState] = useState<HeroMode>('dynamic');
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
 
   // Fetch hero images on mount
   useEffect(() => {
-    fetchImages();
+    void fetchInitialData();
   }, []);
+
+  const fetchInitialData = async () => {
+    await Promise.all([fetchImages(), fetchHeroModeSetting()]);
+  };
 
   const fetchImages = async () => {
     try {
@@ -43,6 +50,44 @@ export default function ManageHomePage() {
       setError('Failed to load images');
     } finally {
       setIsLoadingImages(false);
+    }
+  };
+
+  const fetchHeroModeSetting = async () => {
+    try {
+      const result = await getHeroMode();
+      if (result.success && result.data) {
+        setHeroModeState(result.data);
+      }
+    } catch (err) {
+      console.error('[fetchHeroModeSetting] Error fetching hero mode:', err);
+    }
+  };
+
+  const handleHeroModeChange = async (mode: HeroMode) => {
+    setError('');
+    setSuccess('');
+    setIsSavingMode(true);
+
+    try {
+      const result = await setHeroMode(mode);
+
+      if (result.success && result.data) {
+        setHeroModeState(result.data);
+
+        if (process.env.NODE_ENV !== 'production') {
+          document.cookie = `hero_mode_override=${result.data}; path=/; max-age=${60 * 60 * 24 * 30}; samesite=lax`;
+        }
+
+        setSuccess(`Hero mode updated to ${result.data === 'static' ? 'Static' : 'Dynamic'}.`);
+      } else {
+        setError(result.error || 'Failed to update hero mode');
+      }
+    } catch (err) {
+      console.error('[handleHeroModeChange] Unexpected error:', err);
+      setError(err instanceof Error ? err.message : 'Failed to update hero mode');
+    } finally {
+      setIsSavingMode(false);
     }
   };
 
@@ -302,6 +347,71 @@ export default function ManageHomePage() {
               </button>
             </form>
           </div>
+
+          <div className="mt-4 bg-white rounded-lg shadow-md border border-slate-200 overflow-hidden">
+            <div className="bg-gradient-to-r from-slate-900 to-slate-800 px-4 sm:px-6 py-4">
+              <h2 className="text-base sm:text-lg font-bold text-white">Hero Mode</h2>
+            </div>
+
+            <div className="p-4 sm:p-6 space-y-4">
+              <p className="text-sm text-slate-600">
+                Choose which hero section appears on the homepage.
+              </p>
+
+              <div className="grid grid-cols-1 gap-3">
+                {[
+                  {
+                    value: 'dynamic' as HeroMode,
+                    title: 'Dynamic',
+                    description: 'Uses the current image carousel powered by hero uploads.',
+                    icon: LayoutGrid,
+                  },
+                  {
+                    value: 'static' as HeroMode,
+                    title: 'Static',
+                    description: 'Uses the premium front-view campus hero image.',
+                    icon: Monitor,
+                  },
+                ].map((option) => {
+                  const Icon = option.icon;
+                  const isSelected = heroMode === option.value;
+
+                  return (
+                    <button
+                      key={option.value}
+                      type="button"
+                      onClick={() => void handleHeroModeChange(option.value)}
+                      disabled={isSavingMode}
+                      className={`flex items-start gap-3 rounded-xl border p-4 text-left transition ${
+                        isSelected
+                          ? 'border-yellow-400 bg-yellow-50 shadow-sm'
+                          : 'border-slate-200 bg-white hover:border-slate-300 hover:bg-slate-50'
+                      } disabled:cursor-not-allowed disabled:opacity-60`}
+                    >
+                      <div className={`rounded-lg p-2 ${isSelected ? 'bg-yellow-100 text-slate-900' : 'bg-slate-100 text-slate-700'}`}>
+                        <Icon className="h-4 w-4" />
+                      </div>
+                      <div className="flex-1">
+                        <div className="flex items-center justify-between gap-3">
+                          <p className="text-sm font-semibold text-slate-900">{option.title}</p>
+                          {isSelected && (
+                            <span className="rounded-full bg-yellow-400 px-2.5 py-0.5 text-[11px] font-semibold text-slate-900">
+                              Active
+                            </span>
+                          )}
+                        </div>
+                        <p className="mt-1 text-xs leading-5 text-slate-600">{option.description}</p>
+                      </div>
+                    </button>
+                  );
+                })}
+              </div>
+
+              {isSavingMode && (
+                <p className="text-xs text-slate-500">Saving hero mode...</p>
+              )}
+            </div>
+          </div>
         </div>
 
         {/* Hero Images Grid */}
@@ -311,6 +421,15 @@ export default function ManageHomePage() {
               <h2 className="text-lg font-bold text-white">
                 Hero Images ({heroImages.length})
               </h2>
+            </div>
+
+            <div className="border-b border-slate-200 bg-slate-50 px-6 py-4">
+              <div className="flex items-center gap-3 text-sm text-slate-700">
+                <ImageIcon className="h-4 w-4 text-slate-500" />
+                <span>
+                  Homepage is currently using the <strong>{heroMode === 'static' ? 'Static' : 'Dynamic'}</strong> hero.
+                </span>
+              </div>
             </div>
 
             {isLoadingImages ? (

@@ -1,17 +1,21 @@
+export const dynamic = 'force-dynamic';
+
 import { HeroCarousel as HeroSection } from "@/components/hero-carousel";
+import { StaticHero } from "@/components/static-hero";
 import { AboutTeaser } from "@/components/about-teaser";
 import { TopperTeaser } from "@/components/topper-teaser";
 import { FeaturedGallery } from "@/components/featured-gallery";
 import { getFeaturedImages } from "@/app/actions/getFeaturedImages";
+import { getHeroMode } from "@/app/actions/heroImages";
 
 export default async function Home() {
-  // PHASE 2: Fetch featured images from Firestore
-  const result = await getFeaturedImages();
+  const [result, heroModeResult] = await Promise.all([getFeaturedImages(), getHeroMode()]);
+  const heroMode = heroModeResult.success ? heroModeResult.data : 'dynamic';
 
   return (
     <main className="relative mx-auto flex w-full max-w-7xl flex-col gap-16 px-4 py-6 sm:px-6 lg:px-8">
-      <article aria-labelledby="hero-heading" className="w-full">
-        <HeroSection />
+      <article className="w-full">
+        {heroMode === 'static' ? <StaticHero /> : <HeroSection />}
       </article>
 
       <AboutTeaser />

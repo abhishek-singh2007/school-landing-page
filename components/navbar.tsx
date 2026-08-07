@@ -1,6 +1,7 @@
 "use client";
 
 import { AnimatePresence, motion } from "framer-motion";
+import Image from "next/image";
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 
@@ -57,55 +58,81 @@ export function Navbar() {
         aria-label="Primary"
         className="border-b border-white/50 bg-white/80 backdrop-blur-md dark:border-white/10 dark:bg-slate-950/80"
       >
-        <div className="mx-auto flex w-full max-w-7xl items-center justify-between px-4 py-4 sm:px-6 lg:px-8">
-          <Link href="#home" className="text-2xl font-black tracking-[0.35em] text-slate-950 dark:text-white" aria-label="JKD home">
-            JKD
+        <div className="mx-auto flex w-full max-w-7xl items-center gap-4 px-4 py-3 sm:px-6 lg:px-8">
+          <Link
+            href="#home"
+            className="inline-flex shrink-0 items-center rounded-2xl border border-slate-200/70 bg-white/90 p-1.5 shadow-sm dark:border-white/10 dark:bg-slate-950/60"
+            aria-label="JKD home"
+          >
+            <Image
+              src="/hero/jkd.svg"
+              alt="JKD International Inter College"
+              width={80}
+              height={80}
+              priority
+              className="h-[4.5rem] w-[4.5rem] shrink-0 object-contain sm:h-20 sm:w-20"
+            />
+            <span className="sr-only">JKD International Inter College</span>
           </Link>
 
-          <div className="flex items-center gap-2">
-            <button
-              type="button"
-              onClick={toggleTheme}
-              className="inline-flex h-11 w-11 items-center justify-center rounded-full border border-slate-200 bg-white/70 text-slate-800 transition hover:-translate-y-0.5 hover:border-pillar-300 hover:text-pillar-600 dark:border-white/10 dark:bg-white/5 dark:text-slate-100"
-              aria-label="Toggle dark mode"
-            >
-              {theme === "dark" ? (
-                <svg viewBox="0 0 24 24" className="h-5 w-5 fill-none stroke-current stroke-[1.7]" aria-hidden="true">
-                  <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79Z" />
-                </svg>
-              ) : (
-                <svg viewBox="0 0 24 24" className="h-5 w-5 fill-none stroke-current stroke-[1.7]" aria-hidden="true">
-                  <circle cx="12" cy="12" r="4" />
-                  <path d="M12 2v2.5M12 19.5V22M4.93 4.93l1.77 1.77M17.3 17.3l1.77 1.77M2 12h2.5M19.5 12H22M4.93 19.07l1.77-1.77M17.3 6.7l1.77-1.77" />
-                </svg>
-              )}
-            </button>
+          <div className="flex min-w-0 flex-1 items-center justify-between gap-3 border-b border-slate-200/80 pb-3 dark:border-white/10">
+            <div className="hidden min-w-0 items-center gap-6 md:flex">
+              {navLinks.map((link) => (
+                <Link
+                  key={link.href}
+                  href={link.href}
+                  className="text-xs font-semibold uppercase tracking-[0.28em] text-slate-600 transition hover:text-slate-950 dark:text-slate-300 dark:hover:text-white"
+                >
+                  {link.label}
+                </Link>
+              ))}
+            </div>
 
-            <button
-              type="button"
-              onClick={() => setMenuOpen((value) => !value)}
-              className="group inline-flex h-11 w-11 items-center justify-center rounded-full border border-slate-200 bg-white/70 text-slate-900 transition hover:-translate-y-0.5 hover:border-pillar-300 dark:border-white/10 dark:bg-white/5 dark:text-white"
-              aria-label={menuOpen ? "Close menu" : "Open menu"}
-              aria-expanded={menuOpen}
-            >
-              <span className="relative block h-4 w-5">
-                <span
-                  className={`absolute left-0 top-0 block h-0.5 w-5 origin-center rounded-full bg-current transition duration-300 ${
-                    menuOpen ? "translate-y-2 rotate-45" : "translate-y-0 rotate-0"
-                  }`}
-                />
-                <span
-                  className={`absolute left-0 top-1.5 block h-0.5 w-5 origin-center rounded-full bg-current transition duration-300 ${
-                    menuOpen ? "scale-x-0 opacity-0" : "scale-x-100 opacity-100"
-                  }`}
-                />
-                <span
-                  className={`absolute left-0 top-3 block h-0.5 w-5 origin-center rounded-full bg-current transition duration-300 ${
-                    menuOpen ? "-translate-y-2 -rotate-45" : "translate-y-0 rotate-0"
-                  }`}
-                />
-              </span>
-            </button>
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={toggleTheme}
+                className="inline-flex h-11 w-11 items-center justify-center rounded-full border border-slate-200 bg-white/70 text-slate-800 transition hover:-translate-y-0.5 hover:border-pillar-300 hover:text-pillar-600 dark:border-white/10 dark:bg-white/5 dark:text-slate-100"
+                aria-label="Toggle dark mode"
+              >
+                {theme === "dark" ? (
+                  <svg viewBox="0 0 24 24" className="h-5 w-5 fill-none stroke-current stroke-[1.7]" aria-hidden="true">
+                    <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79Z" />
+                  </svg>
+                ) : (
+                  <svg viewBox="0 0 24 24" className="h-5 w-5 fill-none stroke-current stroke-[1.7]" aria-hidden="true">
+                    <circle cx="12" cy="12" r="4" />
+                    <path d="M12 2v2.5M12 19.5V22M4.93 4.93l1.77 1.77M17.3 17.3l1.77 1.77M2 12h2.5M19.5 12H22M4.93 19.07l1.77-1.77M17.3 6.7l1.77-1.77" />
+                  </svg>
+                )}
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setMenuOpen((value) => !value)}
+                className="group inline-flex h-11 w-11 items-center justify-center rounded-full border border-slate-200 bg-white/70 text-slate-900 transition hover:-translate-y-0.5 hover:border-pillar-300 dark:border-white/10 dark:bg-white/5 dark:text-white"
+                aria-label={menuOpen ? "Close menu" : "Open menu"}
+                aria-expanded={menuOpen}
+              >
+                <span className="relative block h-4 w-5">
+                  <span
+                    className={`absolute left-0 top-0 block h-0.5 w-5 origin-center rounded-full bg-current transition duration-300 ${
+                      menuOpen ? "translate-y-2 rotate-45" : "translate-y-0 rotate-0"
+                    }`}
+                  />
+                  <span
+                    className={`absolute left-0 top-1.5 block h-0.5 w-5 origin-center rounded-full bg-current transition duration-300 ${
+                      menuOpen ? "scale-x-0 opacity-0" : "scale-x-100 opacity-100"
+                    }`}
+                  />
+                  <span
+                    className={`absolute left-0 top-3 block h-0.5 w-5 origin-center rounded-full bg-current transition duration-300 ${
+                      menuOpen ? "-translate-y-2 -rotate-45" : "translate-y-0 rotate-0"
+                    }`}
+                  />
+                </span>
+              </button>
+            </div>
           </div>
         </div>
       </nav>

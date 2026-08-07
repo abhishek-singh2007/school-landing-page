@@ -2,8 +2,32 @@
 
 import { v2 as cloudinary } from 'cloudinary';
 import { db } from '@/lib/firebase';
-import { collection, addDoc, deleteDoc, doc, query, where, getDocs, serverTimestamp } from 'firebase/firestore';
+import { collection, addDoc, deleteDoc, doc, getDoc, getDocs, query, setDoc, where, serverTimestamp } from 'firebase/firestore';
 import { requireAdminActionAccess, requireAdminSession } from '@/lib/admin-access';
+import { revalidatePath } from 'next/cache';
+import { cookies } from 'next/headers';
+
+export type HeroMode = 'dynamic' | 'static';
+
+const HERO_SETTINGS_KIND = 'homepage_setting';
+const HERO_SETTINGS_DOC_ID = 'homepage_setting';
+const HERO_MODE_COOKIE = 'hero_mode_override';
+const isDevelopment = process.env.NODE_ENV !== 'production';
+
+function normalizeHeroMode(value: unknown): HeroMode {
+  return value === 'static' ? 'static' : 'dynamic';
+}
+
+async function readHeroModeCookie(): Promise<HeroMode | null> {
+  const cookieStore = await cookies();
+  const value = cookieStore.get(HERO_MODE_COOKIE)?.value;
+
+  if (value === 'static' || value === 'dynamic') {
+    return value;
+  }
+
+  return null;
+}
 
 cloudinary.config({
   cloud_name: process.env.NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME,
@@ -182,6 +206,10 @@ export async function getHeroImages(): Promise<
   }>
 > {
   try {
+    if (isDevelopment) {
+      return [];
+    }
+
     await requireAdminSession();
 
     console.log('[getHeroImages] Fetching hero images from Firebase...');
@@ -190,20 +218,126 @@ export async function getHeroImages(): Promise<
 
     console.log('[getHeroImages] Found', querySnapshot.size, 'images in Firebase');
 
-    const images = querySnapshot.docs.map((doc) => ({
-      id: doc.id,
-      public_id: doc.data().public_id,
-      secure_url: doc.data().secure_url,
-      heading: doc.data().heading || '',
-      subheading: doc.data().subheading || '',
-      width: doc.data().width,
-      height: doc.data().height,
-    }));
+    const images = querySnapshot.docs
+      .filter((doc) => doc.data().kind !== HERO_SETTINGS_KIND && !!doc.data().secure_url)
+      .map((doc) => ({
+        id: doc.id,
+        public_id: doc.data().public_id,
+        secure_url: doc.data().secure_url,
+        heading: doc.data().heading || '',
+        subheading: doc.data().subheading || '',
+        width: doc.data().width,
+        height: doc.data().height,
+      }));
 
     console.log('[getHeroImages] Successfully fetched and mapped images');
     return images;
   } catch (error) {
     console.error('[getHeroImages] Error fetching images:', error);
     return [];
+  }
+}
+
+export async function getHeroMode(): Promise<{
+  success: boolean;
+  data?: HeroMode;
+  error?: string;
+}> {
+  try {
+    if (isDevelopment) {
+      const cookieMode = await readHeroModeCookie();
+
+      return {
+        success: true,
+        data: cookieMode ?? 'dynamic',
+      };
+    }
+
+    const fixedSetting = await getDoc(doc(db, 'hero_images', HERO_SETTINGS_DOC_ID));
+
+    if (fixedSetting.exists() && fixedSetting.data().kind === HERO_SETTINGS_KIND) {
+      return {
+        success: true,
+        data: normalizeHeroMode(fixedSetting.data().heroMode),
+      };
+    }
+
+    const querySnapshot = await getDocs(query(collection(db, 'hero_images')));
+    const latestLegacySetting = querySnapshot.docs
+      .filter((heroDoc) => heroDoc.data().kind === HERO_SETTINGS_KIND)
+      .sort((left, right) => {
+        const leftTime = left.data().updated_at?.toMillis?.() ?? left.data().created_at?.toMillis?.() ?? 0;
+        const rightTime = right.data().updated_at?.toMillis?.() ?? right.data().created_at?.toMillis?.() ?? 0;
+        return rightTime - leftTime;
+      })[0];
+
+    if (!latestLegacySetting) {
+      return { success: true, data: 'dynamic' };
+    }
+
+    return {
+      success: true,
+      data: normalizeHeroMode(latestLegacySetting.data().heroMode),
+    };
+  } catch (error) {
+    console.error('[getHeroMode] Error fetching hero mode:', error);
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : 'Failed to fetch hero mode',
+    };
+  }
+}
+
+export async function setHeroMode(mode: HeroMode): Promise<{
+  success: boolean;
+  data?: HeroMode;
+  error?: string;
+}> {
+  try {
+    await requireAdminActionAccess('setHeroMode', {
+      limit: 20,
+      windowMs: 60 * 1000,
+    });
+
+    const nextMode = normalizeHeroMode(mode);
+
+    if (isDevelopment) {
+      const cookieStore = await cookies();
+      cookieStore.set(HERO_MODE_COOKIE, nextMode, {
+        path: '/',
+        sameSite: 'lax',
+        httpOnly: false,
+        secure: false,
+        maxAge: 60 * 60 * 24 * 30,
+      });
+
+      revalidatePath('/');
+      revalidatePath('/admin/manage-home');
+
+      return {
+        success: true,
+        data: nextMode,
+      };
+    }
+
+    await setDoc(doc(db, 'hero_images', HERO_SETTINGS_DOC_ID), {
+      kind: HERO_SETTINGS_KIND,
+      heroMode: nextMode,
+      created_at: serverTimestamp(),
+      updated_at: serverTimestamp(),
+    });
+
+    revalidatePath('/');
+
+    return {
+      success: true,
+      data: nextMode,
+    };
+  } catch (error) {
+    console.error('[setHeroMode] Error updating hero mode:', error);
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : 'Failed to update hero mode',
+    };
   }
 }
